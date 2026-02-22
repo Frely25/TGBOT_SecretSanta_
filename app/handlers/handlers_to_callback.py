@@ -53,7 +53,7 @@ async def btn_list_of_members(callback: CallbackQuery, state: FSMContext):
 @router_callback.callback_query(F.data == "send_invite")
 async def btn_send_invite(callback: CallbackQuery, state: FSMContext):
     await state.set_state(InRoomToAdmin.send_invite_name)
-    await callback.message.answer("Введите имя пользователя, которому хотите отпрваить приглашение: ")
+    await callback.message.answer("Введите имя пользователя, которому хотите отправить приглашение: ")
 
 @router_callback.callback_query(F.data == "menu_room")
 async def btn_menu_room(callback: CallbackQuery, state: FSMContext):
