@@ -1,9 +1,10 @@
 import sqlite3
 import re
-
+import asyncio
 import app.keyboard as kb
 import app.states as sts
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -30,8 +31,8 @@ async def handler_to_old_password(message: Message, state: FSMContext):
         await state.set_state(sts.InRoomToAdmin.info_of_room)
     else:
         await message.answer("""Новый пароль не подходит под критерии:
-                             -8 символов
-                             -Латинские буквы или цифры""") 
+    -8 символов
+    -Латинские буквы или цифры""") 
 
 
 @router_admin.message(sts.InRoomToAdmin.old_password)
@@ -78,16 +79,18 @@ async def send_invite_stage_name(message: Message, state: FSMContext):
         if get_bd == None:
             await message.answer(f"Пользователь с ником {message.text} не зарегестрирован в боте")
         elif len(get_bd) == 1:
-            await message.answer(f"Приглашение пользователю <b>{message.text}</b> отправлено", parse_mode="html")
             info = await state.get_data()
             info = info["main_menu"]
             cursor.execute("SELECT * FROM rooms WHERE id = ?", (int(info), ))
             info = cursor.fetchone()[0]
-            print(info)
-            await message.bot.send_message(chat_id=get_bd[0], text=f"Пользователь {message.chat.first_name} отправил вам предложение вступить в комнату")
+            print(f"info: {info}")
+            print(f"get_bd: {get_bd}")
+            await message.bot.send_message(chat_id=int(get_bd[0][0]), text=f"Пользователь {message.chat.first_name} отправил вам предложение вступить в комнату", reply_markup=kb.menu_to_invited)
+            await message.answer(f"Приглашение пользователю <b>{message.text}</b> отправлено", parse_mode="html")
         else:
-            pass
-            #Логика выбора по ID
+            keyboard, users_str = await kb.btns_to_people(message.text)
+            await state.update_data(send_invite_name=users_str)
+            await message.answer(f"В базе данных есть несколько пользователей с именем <b>{message.chat.first_name}</b>. Вы берете нужного вам пользователя по chat_id.", reply_markup=keyboard, parse_mode="html")
 
 @router_admin.message(sts.InRoomToAdmin.info_of_room)
 async def handler_to_info(message: Message, state: FSMContext):

@@ -2,7 +2,7 @@ import re
 import sqlite3
 
 import app.keyboard as kb
-from app.states import CreateRoom, EnterRoom, InRoomToAdmin, InRoomToPlayer
+import app.states as sts 
 
 
 from aiogram import Router
@@ -28,40 +28,20 @@ async def cmd_start(message: Message):
                                 id_admin TEXT, 
                                 users TEXT)
         """)
-
-        """
-        cursor.execute("SELECT * FROM users")
-        print(cursor.fetchone())
-        """
-        
         cursor.execute("SELECT id FROM users WHERE id=?", (message.chat.id, ))
         if cursor.fetchone() == None:
             print("Такого пользователя не существует")
             data = (message.chat.id, message.from_user.first_name)
             cursor.execute("INSERT INTO users (id, name) VALUES (?,?)", data)
             conn.commit()
-
-        """
-        bob = ("Bob", 42)
-        cursor.execute("INSERT INTO people (name, age) VALUES (?, ?)", bob)
-        """
-
-    await message.answer(f"Добро пожаловать, {message.from_user.first_name},в игру \"Тайный санта в тгэшке\".\nВыберете пункт меню:",
-                         reply_markup=kb.main)
-
-
-@router_enter.message(Command("test"))
-async def cmd_help(message: Message):
-    await message.answer("Пример: ", reply_markup=await kb.inline_names())
-
-
+    await message.answer(f"Добро пожаловать, {message.from_user.first_name},в игру \"Тайный санта в тгэшке\".\nВыберете пункт меню:", reply_markup=kb.main)
 
 
 """     Состояния входа в комнату       """
 
 
 #Отловка сообщения пользователя в статусе написания НАЗВАНИЯ комнаты при входе
-@router_enter.message(EnterRoom.name_for_enter)
+@router_enter.message(sts.EnterRoom.name_for_enter)
 async def stage_first_enter(message: Message, state: FSMContext):
     btns = await kb.btns_rooms(message.text)
     match btns[1]:
@@ -77,16 +57,11 @@ async def stage_first_enter(message: Message, state: FSMContext):
             await message.answer("По вашему запросу подходит несколько комнат. Выберете комнату с нужным для вас ID."
                                         , reply_markup= btns[0])
 
-@router_enter.message(EnterRoom.password_for_enter)
+@router_enter.message(sts.EnterRoom.password_for_enter)
 async def stage_second_enter(message: Message, state: FSMContext):
     data = await state.get_data()
-    print(data)
     data = str(data['name_for_enter'])
-    print(data)
     id, name = int(data[data.index('|')+6 : ]), data[data.index(' ')+1 : data.index('|')-1]
-
-    print(f"ID: {id}\nName: {name}")
-    
     with sqlite3.connect("secret_santa.db") as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT password, id_admin  FROM rooms WHERE id=?", (id, )) #Вытянуть ID при после ввода названия и распределения
@@ -117,7 +92,7 @@ async def stage_second_enter(message: Message, state: FSMContext):
 """     Состояния создания комнат      """
 
 #Отловка сообщения пользователя в статусе написания НАЗВАНИЯ комнаты
-@router_enter.message(CreateRoom.name)
+@router_enter.message(sts.CreateRoom.name)
 async def stage_first(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
     await state.set_state(CreateRoom.password)
@@ -125,12 +100,11 @@ async def stage_first(message: Message, state: FSMContext):
 
 
 #Отловка сообщения пользователя в статусе написания ПАРОЛЯ для комнаты
-@router_enter.message(CreateRoom.password)
+@router_enter.message(sts.CreateRoom.password)
 async def stage_second(message:Message, state: FSMContext):
 
     pattern = r"[a-zA-Z0-9]{8,20}"
     match = re.search(pattern, message.text)
-
     if (match != None):
         with sqlite3.connect("secret_santa.db") as conn:
             cursor = conn.cursor()
@@ -149,18 +123,16 @@ async def stage_second(message:Message, state: FSMContext):
                     save_data = f"{created_rooms[i][0]+1}"
                     flag = False
                     break
-
             if flag:
                 cursor.execute("INSERT INTO rooms (id, name, password, id_admin) VALUES (?, ?, ?, ?)"
                                     ,(len(created_rooms), data["name"], data["password"], message.chat.id)
                 )
                 save_data = f"{len(created_rooms)}"
-
             conn.commit()
             await state.clear()
             await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
             await state.set_state(InRoomToAdmin.main_menu)
             await state.update_data(main_menu=save_data)
     else:
-        await message.answer("Вы ввели некорректный пароль!")
+        await message.answer("Вы ввели некорректный пароль! Пароль должен состоять минимум из 8 символов и содержать только латинские буквы или цифры")
     

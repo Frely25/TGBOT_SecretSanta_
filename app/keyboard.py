@@ -6,17 +6,21 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 main = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Войти в комнату", callback_data="enter")],
-    [InlineKeyboardButton(text="Создать комнату", callback_data="create")]
+    [InlineKeyboardButton(text="Создать комнату", callback_data="create")],
+    [InlineKeyboardButton(text="Посмотреть информацию о себе", callback_data="info_about_me")]
 ])
 
+menu_to_invited = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="Принять приглашение", callback_data="accept")],
+    [InlineKeyboardButton(text="Отказаться", callback_data="refuse")]
+])
 
 menu_to_rooms_for_admin = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Игра", callback_data="menu_play")],
         [InlineKeyboardButton(text="Список участников", callback_data="list_of_members"), InlineKeyboardButton(text="Пригласить", callback_data="send_invite")],
         [InlineKeyboardButton(text="Информация о комнате", callback_data="info_of_room")],
         [InlineKeyboardButton(text="Выход в главное меню", callback_data="main_menu")]
-    ]
-)
+])
 
 menu_to_rooms_for_player = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Список участников", callback_data="list_of_members")],
@@ -38,13 +42,10 @@ menu_for_member = InlineKeyboardMarkup(inline_keyboard=[
 
 async def btns_rooms(name: str):
     keyboard, ret_list = InlineKeyboardBuilder(), ""
-
     with sqlite3.connect("secret_santa.db") as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, name FROM rooms WHERE name=?", (name,))
         filtered_list = cursor.fetchall()
-        
-        
         for room in filtered_list:
             btn = f"Название: {room[1]} | ID: {room[0]}"
             keyboard.add(InlineKeyboardButton(text=btn, callback_data=btn))
@@ -71,3 +72,14 @@ async def btns_list_members(id: int):
         keyboard.add(InlineKeyboardButton(text="Выйти в меню комнаты", callback_data="menu_room"))
         return keyboard.adjust(2).as_markup(), 1
 
+async def btns_to_people(name: str):
+    keyboard = InlineKeyboardBuilder()
+    with sqlite3.connect("secret_santa.db") as conn:
+        ret_s = ""
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM rooms WHERE name = ?", (name, ))
+        data = cursor.fetchall()
+        for user in data:
+            ret_s += f"{user[0]};"
+            keyboard.add(InLineKeyboardButton(text=name, callback_data=f"{user[0]}"))
+        return keyboard.adjust(2).as_markup(), ret_s[:-1]
