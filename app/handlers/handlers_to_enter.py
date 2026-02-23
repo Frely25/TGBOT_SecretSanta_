@@ -107,8 +107,9 @@ async def stage_second_enter(message: Message, state: FSMContext):
                 print(f"get_bd: {get_bd}")
                 get_bd = f'{get_bd};?' if get_bd != None else '?'
                 print(f"get_bd after: {get_bd}")
-                cursor.execute(f"UPDATE rooms SET users = {get_bd} WHERE id=?", (f"{message.chat.id}", id))
-                conn.commit()
+                if get_bd == "?" or not(str(message.chat.id) in get_bd.split(';')):
+                    cursor.execute(f"UPDATE rooms SET users = {get_bd} WHERE id=?", (f"{message.chat.id}", id))
+                    conn.commit()
                 await message.answer(f"Вы находитесь в главном меню {name} команты.", reply_markup=kb.menu_to_rooms_for_player)
 
 

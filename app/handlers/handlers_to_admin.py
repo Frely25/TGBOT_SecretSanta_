@@ -79,7 +79,12 @@ async def send_invite_stage_name(message: Message, state: FSMContext):
             await message.answer(f"Пользователь с ником {message.text} не зарегестрирован в боте")
         elif len(get_bd) == 1:
             await message.answer(f"Приглашение пользователю <b>{message.text}</b> отправлено", parse_mode="html")
-            # Логика отправки
+            info = await state.get_data()
+            info = info["main_menu"]
+            cursor.execute("SELECT * FROM rooms WHERE id = ?", (int(info), ))
+            info = cursor.fetchone()[0]
+            print(info)
+            await message.bot.send_message(chat_id=get_bd[0], text=f"Пользователь {message.chat.first_name} отправил вам предложение вступить в комнату")
         else:
             pass
             #Логика выбора по ID
@@ -96,5 +101,3 @@ async def handler_to_info(message: Message, state: FSMContext):
     elif text == "выход в главное меню":
         await state.set_state(sts.InRoomToAdmin.main_menu)
         await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
-    
-        
