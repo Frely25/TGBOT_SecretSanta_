@@ -83,10 +83,12 @@ async def send_invite_stage_name(message: Message, state: FSMContext):
             info = info["main_menu"]
             cursor.execute("SELECT * FROM rooms WHERE id = ?", (int(info), ))
             info = cursor.fetchone()[0]
-            print(f"info: {info}")
-            print(f"get_bd: {get_bd}")
-            await message.bot.send_message(chat_id=int(get_bd[0][0]), text=f"Пользователь {message.chat.first_name} отправил вам предложение вступить в комнату", reply_markup=kb.menu_to_invited)
+            #print(f"info: {info}")
+            #print(f"get_bd: {get_bd}")
+            await message.bot.send_message(chat_id=int(get_bd[0][0]), text=f"Пользователь {message.chat.first_name} отправил вам предложение вступить в комнату", reply_markup=await kb.btns_to_invite(int(info)))
             await message.answer(f"Приглашение пользователю <b>{message.text}</b> отправлено", parse_mode="html")
+            await asyncio.sleep(2)
+            await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
         else:
             keyboard, users_str = await kb.btns_to_people(message.text)
             await state.update_data(send_invite_name=users_str)
@@ -103,4 +105,7 @@ async def handler_to_info(message: Message, state: FSMContext):
         await message.answer("Введите новое название комнаты! Или введите 0, чтобы отменить свой выбор")
     elif text == "выход в главное меню":
         await state.set_state(sts.InRoomToAdmin.main_menu)
+        data = await state.get_data()
+        data = data["info_of_room"]
+        await message.delete(message_id=data) # Реализовать удаление сообщения информации о комнате
         await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)

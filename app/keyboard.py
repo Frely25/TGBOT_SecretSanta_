@@ -10,11 +10,6 @@ main = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Посмотреть информацию о себе", callback_data="info_about_me")]
 ])
 
-menu_to_invited = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Принять приглашение", callback_data="accept")],
-    [InlineKeyboardButton(text="Отказаться", callback_data="refuse")]
-])
-
 menu_to_rooms_for_admin = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Игра", callback_data="menu_play")],
         [InlineKeyboardButton(text="Список участников", callback_data="list_of_members"), InlineKeyboardButton(text="Пригласить", callback_data="send_invite")],
@@ -62,7 +57,7 @@ async def btns_list_members(id: int):
         if (data == None):
             keyboard.add(InlineKeyboardButton(text="Выйти в меню комнаты", callback_data="menu_room"))
             return keyboard.as_markup(), 0
-        data = [int(x) for x in (data.split(";"))]
+        data = [int(x) for x in (data.split("_"))]
         voprosiki = ','.join(["?"] * len(data))
         
         cursor.execute(f"SELECT * FROM users WHERE id IN ({voprosiki})", (data))
@@ -77,9 +72,16 @@ async def btns_to_people(name: str):
     with sqlite3.connect("secret_santa.db") as conn:
         ret_s = ""
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM rooms WHERE name = ?", (name, ))
+        cursor.execute("SELECT id FROM users WHERE name = ?", (name, ))
         data = cursor.fetchall()
         for user in data:
-            ret_s += f"{user[0]};"
-            keyboard.add(InLineKeyboardButton(text=name, callback_data=f"{user[0]}"))
+            ret_s += f"{user[0]}_"
+            keyboard.add(InlineKeyboardButton(text=name, callback_data=f"{user[0]}"))
         return keyboard.adjust(2).as_markup(), ret_s[:-1]
+
+async def btns_to_invite(id: int):
+    return InlineKeyboardBuilder([
+        [InlineKeyboardButton(text="Принять", callback_data=f"join_{id}")],
+        [InlineKeyboardButton(text="Отказаться", callback_data=f"refuse")]
+]).as_markup()
+

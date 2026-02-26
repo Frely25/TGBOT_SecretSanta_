@@ -49,7 +49,7 @@ async def stage_first_enter(message: Message, state: FSMContext):
             await message.answer("Вы ввели не существующую комнату. Введите другое название!")
         case 1:
             await state.update_data(name_for_enter=btns[2])
-            await state.set_state(EnterRoom.password_for_enter)
+            await state.set_state(sts.EnterRoom.password_for_enter)
             await message.answer(f"Отлично! Теперь введите пароль для комнаты \"{message.text}\":")
         case _:
             #await state.set_state(EnterRoom.save_btns)
@@ -79,11 +79,9 @@ async def stage_second_enter(message: Message, state: FSMContext):
                 await state.update_data(main_menu=id)
                 cursor.execute("SELECT users FROM rooms WHERE id = ?", (id, ))
                 get_bd = cursor.fetchone()[0]
-                print(f"get_bd: {get_bd}")
-                get_bd = f'{get_bd};?' if get_bd != None else '?'
-                print(f"get_bd after: {get_bd}")
-                if get_bd == "?" or not(str(message.chat.id) in get_bd.split(';')):
-                    cursor.execute(f"UPDATE rooms SET users = {get_bd} WHERE id=?", (f"{message.chat.id}", id))
+                get_bd = f'{get_bd}_' if get_bd != None else ''
+                if get_bd == "" or not(str(message.chat.id) in get_bd.split('_')):
+                    cursor.execute(f"UPDATE rooms SET users = ? WHERE id=?", (f"{get_bd+str(message.chat.id)}", id))
                     conn.commit()
                 await message.answer(f"Вы находитесь в главном меню {name} команты.", reply_markup=kb.menu_to_rooms_for_player)
 
@@ -95,7 +93,7 @@ async def stage_second_enter(message: Message, state: FSMContext):
 @router_enter.message(sts.CreateRoom.name)
 async def stage_first(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
-    await state.set_state(CreateRoom.password)
+    await state.set_state(sts.CreateRoom.password)
     await message.answer("Отлично! Теперь придумайте пароль для вашей комнаты!")
 
 
@@ -131,7 +129,7 @@ async def stage_second(message:Message, state: FSMContext):
             conn.commit()
             await state.clear()
             await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
-            await state.set_state(InRoomToAdmin.main_menu)
+            await state.set_state(sts.InRoomToAdmin.main_menu)
             await state.update_data(main_menu=save_data)
     else:
         await message.answer("Вы ввели некорректный пароль! Пароль должен состоять минимум из 8 символов и содержать только латинские буквы или цифры")

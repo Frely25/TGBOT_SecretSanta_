@@ -14,29 +14,22 @@ router_callback = Router()
 
 @router_callback.callback_query(lambda c: c.data == "info_of_room")
 async def btn_info_of_room(callback:CallbackQuery, state:FSMContext):
+    print(callback.message.message_id)
     await state.set_state(sts.InRoomToAdmin.info_of_room)
+    await state.update_data(info_of_room=f"{callback.message.message_id}")
     data = await state.get_data()
     data = data['main_menu']
     with sqlite3.connect("secret_santa.db") as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM rooms WHERE id=?", (int(data), ))
         get_bd = cursor.fetchone()
+        await callback.message.delete()
         await callback.message.answer(f"""Информация о комнате: 
 ID комнаты: {get_bd[0]}
 Название комнаты: {get_bd[1]}
 Пароль комнаты: {get_bd[2]}
-ID админа: {get_bd[3]}""")
-    """
-    await state.set_state(InRoomToAdmin.info_of_room)
-    data = await state.get_data()
-    data = data['main_menu'].split(";") + [f"{callback.message.chat.id}"]
-    await callback.message.answer(f""Информация о комнате: 
-                                        ID комнаты: {data[0]}
-                                        Название комнаты: {data[1]}
-                                        Пароль комнаты: {data[2]}
-                                        ID админа: {data[3]}
-                                "", reply_markup=kb.menu_for_info_of_room)
-    """
+ID админа: {get_bd[3]}""", reply_markup=kb.menu_for_info_of_room)
+    
 
 @router_callback.callback_query(lambda c: c.data == "list_of_members")
 async def btn_list_of_members(callback: CallbackQuery, state: FSMContext):
@@ -52,7 +45,7 @@ async def btn_list_of_members(callback: CallbackQuery, state: FSMContext):
 @router_callback.callback_query(F.data == "send_invite")
 async def btn_send_invite(callback: CallbackQuery, state: FSMContext):
     await state.set_state(sts.InRoomToAdmin.send_invite_name)
-    await callback.message.answer("Введите имя пользователя, которому хотите отправить приглашение: ")
+    await callback.message.edit_text("Введите имя пользователя, которому хотите отправить приглашение: ")
 
 @router_callback.callback_query(F.data == "menu_room")
 async def btn_menu_room(callback: CallbackQuery, state: FSMContext):
@@ -95,8 +88,33 @@ Chat id: {callback.message.chat.id}""", reply_markup=kb.main)
 
 @router_callback.callback_query(F.data == "accept")
 async def btn_accept(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    print(data)
+    data = data["main_menu"]
     await state.set_state(sts.InRoomToPlayer.main_menu)
-    await callback.message.edit_text(f"Вы находитесь в главном меню {name} команты.", reply_markup=kb.menu_to_rooms_for_player)
+    with sqlite3.connect("secret_santa.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM rooms WHERE id = ?", (int(data), ))
+        data = cursor.fetchone()
+        await callback.message.edit_text(f"Вы находитесь в главном меню {data[0]} команты.", reply_markup=kb.menu_to_rooms_for_player)
+
+
+@router_callback.callback_query(lambda c: c.data.startswith("join_"))
+async def btn_invite(callback: CallbackQuery, state: FSMContext):
+    room_id = int(callback.data.split("_")[1])
+    await state.set_state(sts.InRoomToPlayer.main_menu)
+    await state.update_data(main_menu=f"{room_id}")
+    with sqlite3.connect("secret_santa.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, users FROM rooms WHERE id = ?", (room_id, ))
+        data = cursor.fetchone()
+        get_bd = f'{data[1]}_' if data[1] != None else ''
+        print(f"get_bd = {get_bd}")
+        print(f"data[1] = {data[1]}")
+        if get_bd == "" or not(str(callback.message.chat.id) in get_bd.split('_')):
+            cursor.execute(f"UPDATE rooms SET users = ? WHERE id=?", (f"{get_bd+str(callback.message.chat.id)}", room_id))
+            conn.commit()
+        await callback.message.edit_text(f"Вы находитесь в главном меню {data[0]} команты.", reply_markup=kb.menu_to_rooms_for_player)
 
 @router_callback.callback_query(F.data == "refuse")
 async def btn_refuse(callback: CallbackQuery):
@@ -122,8 +140,8 @@ async def btn_room(callback: CallbackQuery, state: FSMContext):
         case "InRoomToAdmin:list_of_members":
             await callback.message.edit_text("Выберите пункт меню:", reply_markup=kb.menu_for_member)
         case "InRoomToAdmin:send_invite_name":
-            wdata = await state.get_data()
-            data = data["send_invite_name"].split(";")
+            data = await state.get_data()
+            data = data["send_invite_name"].split("_")
             if callback.data in data:
                 await callback.message.bot.send_message(chat_id=int(callback.data), text=f"Пользователь {callback.message.chat.first_name} отправил вам предложение вступить в комнату", reply_markup=kb.menu_to_invited)
     
