@@ -70,7 +70,7 @@ async def stage_second_enter(message: Message, state: FSMContext):
         if answer[0] == message.text:
             await message.answer(f"Вы успешно вошли в комнату <b>{name}</b>", parse_mode="html")
             if str(message.chat.id) == answer[1]:
-                await state.set_state(InRoomToAdmin.main_menu)
+                await state.set_state(sts.InRoomToAdmin.main_menu)
                 await state.update_data(main_menu=id)
                 await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
             else:
