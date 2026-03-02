@@ -1,5 +1,10 @@
 from aiogram.fsm.state import State, StatesGroup
 
+class InfoOfUser(StatesGroup):
+    name = State()
+    main = State()
+    await_answer = State()
+
 class CreateRoom(StatesGroup):
     name = State()
     password = State()
