@@ -1,9 +1,10 @@
 import sqlite3
 import re
-
+import asyncio
 import app.keyboard as kb
 import app.states as sts
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -30,8 +31,8 @@ async def handler_to_old_password(message: Message, state: FSMContext):
         await state.set_state(sts.InRoomToAdmin.info_of_room)
     else:
         await message.answer("""Новый пароль не подходит под критерии:
-                             -8 символов
-                             -Латинские буквы или цифры""") 
+    -8 символов
+    -Латинские буквы или цифры""") 
 
 
 @router_admin.message(sts.InRoomToAdmin.old_password)
@@ -75,14 +76,26 @@ async def send_invite_stage_name(message: Message, state: FSMContext):
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE name = ?", (message.text, ))
         get_bd = cursor.fetchall()
-        if get_bd == None:
+        print(get_bd)
+        if get_bd == []:
             await message.answer(f"Пользователь с ником {message.text} не зарегестрирован в боте")
+            await asyncio.sleep(2)
+            await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
         elif len(get_bd) == 1:
+            info = await state.get_data()
+            info = info["main_menu"]
+            cursor.execute("SELECT * FROM rooms WHERE id = ?", (int(info), ))
+            info = cursor.fetchone()[0]
+            #print(f"info: {info}")
+            #print(f"get_bd: {get_bd}")
+            await message.bot.send_message(chat_id=int(get_bd[0][0]), text=f"Пользователь {message.chat.first_name} отправил вам предложение вступить в комнату", reply_markup=await kb.btns_to_invite(int(info)))
             await message.answer(f"Приглашение пользователю <b>{message.text}</b> отправлено", parse_mode="html")
-            # Логика отправки
+            await asyncio.sleep(2)
+            await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
         else:
-            pass
-            #Логика выбора по ID
+            keyboard, users_str = await kb.btns_to_people(message.text)
+            await state.update_data(send_invite_name=users_str)
+            await message.answer(f"В базе данных есть несколько пользователей с именем <b>{message.text}</b>. Выберете нужного вам пользователя по chat_id.", reply_markup=keyboard, parse_mode="html")
 
 @router_admin.message(sts.InRoomToAdmin.info_of_room)
 async def handler_to_info(message: Message, state: FSMContext):
@@ -95,6 +108,7 @@ async def handler_to_info(message: Message, state: FSMContext):
         await message.answer("Введите новое название комнаты! Или введите 0, чтобы отменить свой выбор")
     elif text == "выход в главное меню":
         await state.set_state(sts.InRoomToAdmin.main_menu)
+        data = await state.get_data()
+        data = data["info_of_room"]
+        await message.delete(message_id=data) # Реализовать удаление сообщения информации о комнате
         await message.answer(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
-    
-        
