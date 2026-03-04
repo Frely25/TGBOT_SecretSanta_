@@ -57,23 +57,24 @@ async def btns_rooms(name: str):
     return keyboard.adjust(2).as_markup(), len(filtered_list), ret_list[:-1]
 
 
-async def btns_list_members(id: int):
+async def btns_list_members(id_room: int, id_admin: int):
     keyboard = InlineKeyboardBuilder()
     with sqlite3.connect("secret_santa.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT users FROM rooms WHERE id=?", (id,))
-        data = cursor.fetchone()[0]
+        cursor.execute("SELECT users, id_admin FROM rooms WHERE id=?", (id_room,))
+        data = cursor.fetchone()
         if (data == None):
-            keyboard.add(InlineKeyboardButton(text="Выйти в меню комнаты", callback_data="menu_room"))
+            keyboard.add(InlineKeyboardButton(text="Выйти в меню комнаты", callback_data="menu_room_to_admin" if data[1] == id_admin else "menu_room_to_user"))
             return keyboard.as_markup(), 0
-        data = [int(x) for x in (data.split("_"))]
-        voprosiki = ','.join(["?"] * len(data))
+        users = [int(x) for x in (data[0].split("_"))]
+        voprosiki = ','.join(["?"] * len(users))
         
-        cursor.execute(f"SELECT * FROM users WHERE id IN ({voprosiki})", (data))
+        cursor.execute(f"SELECT * FROM users WHERE id IN ({voprosiki})", (users))
         get_bd = cursor.fetchall()
         for user in get_bd:
             keyboard.add(InlineKeyboardButton(text=f"{user[1]}", callback_data=f"{user[0]}"))
-        keyboard.add(InlineKeyboardButton(text="Выйти в меню комнаты", callback_data="menu_room"))
+        
+        keyboard.add(InlineKeyboardButton(text="Выйти в меню комнаты", callback_data="menu_room_to_admin" if data[1] == id_admin else "menu_room_to_user"))
         return keyboard.adjust(2).as_markup(), 1
 
 async def btns_to_people(name: str):

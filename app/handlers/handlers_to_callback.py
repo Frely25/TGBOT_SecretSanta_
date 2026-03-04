@@ -21,7 +21,7 @@ async def btn_approve(callback: CallbackQuery, state: FSMContext):
         if data == None:
             cursor.execute("INSERT INTO users (name, id) VALUES (?, ?)", (data2, callback.message.chat.id))
         else:
-            cursor.execute("UPDATE users SET name = ?", (data2, ))
+            cursor.execute("UPDATE users SET name = ? WHERE id = ?", (data2, callback.message.chat.id))
         conn.commit()
     await callback.message.answer("Вы успешно установили имя.")
     await state.set_state(sts.InfoOfUser.main)
@@ -35,6 +35,7 @@ async def btn_switch(callback: CallbackQuery, state: FSMContext):
 
   
 """        Callback для админа        """
+
 
 @router_callback.callback_query(lambda c: c.data == "info_of_room")
 async def btn_info_of_room(callback:CallbackQuery, state:FSMContext):
@@ -53,28 +54,40 @@ ID комнаты: {get_bd[0]}
 Название комнаты: {get_bd[1]}
 Пароль комнаты: {get_bd[2]}
 ID админа: {get_bd[3]}""", reply_markup=kb.menu_for_info_of_room)
-    
+
 
 @router_callback.callback_query(lambda c: c.data == "list_of_members")
 async def btn_list_of_members(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     data = data["main_menu"]
-    keyboard, code = await kb.btns_list_members(int(data))
-    if code == 0:
-        await callback.message.edit_text("Список участников пуст", reply_markup=keyboard)
-    else:
-        await state.set_state(sts.InRoomToAdmin.list_of_members)
-        await callback.message.edit_text("Список участников: ", reply_markup=keyboard)
+    
+    with sqlite3.connect("secret_santa.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id_admin FROM rooms WHERE id = ?", (int(data), ))
+        get_bd = cursor.fetchone()[0]
+        keyboard, code = await kb.btns_list_members(int(data), int(get_bd))
+        if code == 0:
+            await callback.message.edit_text("Список участников пуст", reply_markup=keyboard)
+        else:
+            await state.set_state(sts.InRoomToAdmin.list_of_members)
+            await callback.message.edit_text("Список участников: ", reply_markup=keyboard)
 
 @router_callback.callback_query(F.data == "send_invite")
 async def btn_send_invite(callback: CallbackQuery, state: FSMContext):
     await state.set_state(sts.InRoomToAdmin.send_invite_name)
     await callback.message.edit_text("Введите имя пользователя, которому хотите отправить приглашение: ")
 
-@router_callback.callback_query(F.data == "menu_room")
+@router_callback.callback_query(F.data == "menu_room_to_admin")
 async def btn_menu_room(callback: CallbackQuery, state: FSMContext):
     await state.set_state(sts.InRoomToAdmin.main_menu)
     await callback.message.edit_text(f"Вы находитесь в главном меню вашей команты.", reply_markup=kb.menu_to_rooms_for_admin)
+
+
+@router_callback.callback_query(F.data == "menu_room_to_user")
+async def btn_menu_room(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(sts.InRoomToPlayer.main_menu)
+    await callback.message.edit_text(f"Вы находитесь в главном меню команты.", reply_markup=kb.menu_to_rooms_for_player)
+
 
 
 @router_callback.callback_query(F.data == "main_menu")
@@ -84,9 +97,13 @@ async def btn_main_menu(callback: CallbackQuery, state: FSMContext):
 
 @router_callback.callback_query(F.data == "back")
 async def btn_back(callback: CallbackQuery, state: FSMContext):
-     data = await state.get_data()
-     data = data["main_menu"]
-     await callback.message.edit_text("Список участников: ", reply_markup= await kb.btns_list_members(int(data)))
+    data = await state.get_data()
+    data = data["main_menu"]
+    with sqlite3.connect("secret_santa.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id_admin FROM rooms WHERE id = ?", (int(data), ))
+        get_bd = cursor.fetchone()[0]
+    await callback.message.edit_text("Список участников: ", reply_markup= await kb.btns_list_members(int(data), int(get_bd)))
 
 
 """        Callback для входа         """
